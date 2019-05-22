@@ -1,0 +1,40 @@
+---
+title: "Alexis_omics1"
+output: html_document
+---
+##SUMMARY##
+Introduction: Diet-induced obesity is associated with hepatic lipid accumulation, increased circulating levels of endotoxin, and chronic low grade inflammation. Hepatic lipid accumulation and resulting non-alcoholic fatty liver disease (NAFLD) can exacerbate systemic inflammation further contributing to neurodegenerative effects. Maple Syrup Extract (MSX), could be a potential source of beneficial phytonutrients capable of mitigating these adverse inflammatory processes from occurring. Methods: A pilot scale diet-induced obesity study with male C57BL/6 mice fed either a standard diet (10% kcal from fat) or a high fat diet (45% kcal from fat) with or without MSX at a dose of 0.5% w/w incorporated into feed for 12 weeks. Livers and whole hippocampi were excised for multiplex gene expression analysis of inflammatory, fatty liver, and neurodegenerative disease associated genes. Livers were scored for lipid accumulation and lipid moieties were quantified.
+Results: In hepatic tissue, MSX protected against lipid accumulation and inflammatory progression. MSX supplementation significantly reduced lipid accumulation scores as well as gene expression of lipid uptake, storage, and inflammatory associated genes. In the hippocampus, MSX supplementation in HFD feed significantly reduced the gene expression of pro-inflammatory, death receptor ligands, anti-oxidant response enzymes, macrophage receptors, and leptin receptor. Conclusions: In the liver, MSX prevents gross hepatic lipid accumulation and suppresses both pro-inflammatory and lipid storage associated genes. In the hippocampus, MSX may act on pro-inflammatory gene expression but TNF mediated death receptor pathways in addition to modulating leptin receptor signaling.
+
+##OVERALL DESIGN##
+
+We analyzed a total of 12 samples, using 3 biological replicates per treatment group. Relative gene expression was compared between the low fat diet (LFD) controls, high fat diet (HFD) controls, low fat-MSX (L-MSX), and high fat-MSX (H-MSX) treatment groups.
+
+##CONTRIBUTOR##
+
+Pfohl M, Schorl C.
+
+##CITATION##
+
+Missing.
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+targets <- read.csv("adata1.txt",sep = "\t")
+```
+
+```{r}
+expressions <- read.delim("GSE131495_series_matrix.txt",header=TRUE,row.names = 1)
+```
+
+```{r}
+dim(expressions)
+summary(expressions)
+```
+
+```{r}
+boxplot(expressions,col = c(2,2,2,3,3,3,4,4,4,5,5,5))
+```
+
