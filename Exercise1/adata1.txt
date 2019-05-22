@@ -1,0 +1,13 @@
+Sample	Replicate	Group
+GSM3781624	rep1	low fat control
+GSM3781625	rep2	low fat control
+GSM3781626	rep3	low fat control
+GSM3781627	rep1	low fat MSX
+GSM3781628	rep2	low fat MSX
+GSM3781629	rep3	low fat MSX
+GSM3781630	rep1	high fat control
+GSM3781631	rep2	high fat control
+GSM3781632	rep3	high fat control
+GSM3781633	rep1	high fat MSX
+GSM3781634	rep2	high fat MSX
+GSM3781635	rep3	high fat MSX
