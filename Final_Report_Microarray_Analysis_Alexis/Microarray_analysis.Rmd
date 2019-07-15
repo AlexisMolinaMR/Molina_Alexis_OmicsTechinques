@@ -1,0 +1,265 @@
+---
+title: "Final project of microarray analysis Alexis Molina"
+output:
+html_document: default
+---
+## Summary of the project
+Analysis of microarray data of GSE112497 using Bioconductor. 
+
+### Summary of the data 	
+Analysis of gene expression in human CAFs with control (shCtrl) or shRNA against NNMT (shNNMT) expression or normal fibroblasts expressing control (Ctrl) or NNMT overexpression (NNMT) constructs. Cells were infected with lentivirus to express the indicated shRNA construct. Hypothesis is that knockdown of NNMT will affect expression of genes via regulation of histone methylation status.
+  	
+### Overall design	
+Total RNA was collected from human cancer associated fibroblasts expressing the indicated shCtrl or shNNMT constructs or from normal WI-38 fibroblasts expressing Ctrl or NNMT constructs and expression analyzed with Affymetrix microarray.
+  	
+
+## Citations
+Eckert MA, Coscia F, Chryplewicz A, Chang JW et al. Proteomics reveals NNMT as a master metabolic regulator of cancer-associated fibroblasts. Nature 2019 May;569(7758):723-728. PMID: 31043742
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#### Load the needed packages before using the code, those can be found in the script
+```{r packages, include=FALSE}
+if (!require(BiocManager)) install.packages("BiocManager")
+
+installifnot <- function (pkg){
+  if (!require(pkg, character.only=T)){
+    BiocManager::install(pkg)
+}else{
+  require(pkg, character.only=T)
+  }
+}
+
+installifnot("pd.mogene.1.0.st.v1")
+installifnot("mogene10sttranscriptcluster.db")
+installifnot("oligo")
+installifnot("limma")
+installifnot("Biobase")
+installifnot("arrayQualityMetrics")
+installifnot("genefilter")
+installifnot("multtest")
+installifnot("annotate")
+installifnot("xtable")
+installifnot("gplots")
+installifnot("scatterplot3d")
+```
+#### Targets summary
+There are 12 samples which can be joined into 4 groups: ShCtrl, ShNNMT, Ctrl, NNMT
+```{r Read targets}
+targets <- read.csv('./data/targets.csv', header = T,sep = ',')
+targets
+```
+```{r include=FALSE}
+workingDir <-getwd()
+dataDir <- file.path(workingDir, "data")
+resultsDir <- file.path(workingDir, "results")
+#setwd(resultsDir)
+```
+Reading cel files and getting into rawData to use later
+```{r Read cel, include=F}
+Cel <- list.celfiles(file.path(dataDir))
+
+rawData <- read.celfiles(file.path(dataDir,Cel))
+
+```
+Getting variables for plots
+```{r Predifine variables for plots}
+sampleNames <- as.character(targets$Short_Name)
+sampleColor <- as.character(targets$Colors)
+```
+#### Quality control by boxplot, PCA and cluster of rawData
+Here we check the quality of our data looking for outliers, artifacts, etc
+```{r Boxplot raw}
+boxplot(rawData, which="all",las=2, main="Intensity distribution of RAW data", 
+        cex.axis=0.6, col=sampleColor, names=sampleNames)
+
+
+```
+
+Data seems to be ok with some variation, but without erros or strange values, some samples seem to look more alike, we will check it with clustering and PCA
+
+Now we cluster data
+
+```{r Cluster Raw}
+clust.euclid.averageR <- hclust(dist(t(exprs(rawData))),method="average")
+plot(clust.euclid.averageR, labels=sampleNames, main="Hierarchical clustering of RawData", 
+     cex=0.7,  hang=-1)
+```
+
+Clusters of this plot are supported by the fact that they have samples that look alike in the boxplot.
+
+Now we do PCA of the data
+
+```{r PCA raw}
+plotPCA <- function ( X, labels=NULL, colors=NULL, dataDesc="", scale=FALSE, formapunts=NULL, myCex=0.8,...)
+{
+  pcX<-prcomp(t(X), scale=scale) # o prcomp(t(X))
+  loads<- round(pcX$sdev^2/sum(pcX$sdev^2)*100,1)
+  xlab<-c(paste("PC1",loads[1],"%"))
+  ylab<-c(paste("PC2",loads[2],"%"))
+  if (is.null(colors)) colors=1
+  plot(pcX$x[,1:2],xlab=xlab,ylab=ylab, col=colors, pch=formapunts, 
+       xlim=c(min(pcX$x[,1])-100000, max(pcX$x[,1])+100000),ylim=c(min(pcX$x[,2])-100000, max(pcX$x[,2])+100000))
+  text(pcX$x[,1],pcX$x[,2], labels, pos=3, cex=myCex)
+  title(paste("Plot of first 2 PCs for expressions in", dataDesc, sep=" "), cex=0.8)
+}
+
+plotPCA(exprs(rawData), labels=sampleNames, dataDesc="raw data", colors=sampleColor,
+        formapunts=c(rep(16,4),rep(17,4)), myCex=0.6)
+
+```
+
+PCA shows as that some groups are really clustered like SHNNMT and others are pretty distinct like Ctrl or NNMT.
+
+####Data normalization and analysis
+
+Here we normalize data to get rid of possible artifacts or errors and check how it changes after the procedure
+
+```{r Normalize, include=F}
+eset<-rma(rawData)
+
+
+```
+
+Redo boxplot, Clustering and PCA
+
+```{r Boxplot normalized}
+#BOXPLOT
+boxplot(eset, las=2, main="Intensity distribution of Normalized data", cex.axis=0.6, 
+        col=sampleColor, names=sampleNames)
+
+```
+
+We can see that data has close to no differences between the observations now, so we may have lost some statistical information, but also some possible artifacts are also lost, so it seems to be worth it
+
+Now we redo clustering and check for the groups
+
+```{r Cluster normalized}
+clust.euclid.averageN <- hclust(dist(t(exprs(eset))),method="average")
+plot(clust.euclid.averageN, labels=sampleNames, main="Hierarchical clustering of NormData", 
+     cex=0.7,  hang=-1)
+```
+
+Now clusters are formed by different samples of the same observations, which means that the difference between the samples is not big, but between the groups is bigger. Also Sh are closer than not Sh
+
+We repeat PCA
+
+```{r PCA normalized}
+plotPCA <- function ( X, labels=NULL, colors=NULL, dataDesc="", scale=FALSE, formapunts=NULL, myCex=0.8,...)
+{
+  pcX<-prcomp(t(X), scale=scale) # o prcomp(t(X))
+  loads<- round(pcX$sdev^2/sum(pcX$sdev^2)*100,1)
+  xlab<-c(paste("PC1",loads[1],"%"))
+  ylab<-c(paste("PC2",loads[2],"%"))
+  if (is.null(colors)) colors=1
+  plot(pcX$x[,1:2],xlab=xlab,ylab=ylab, col=colors, pch=formapunts, 
+       xlim=c(min(pcX$x[,1])-10, max(pcX$x[,1])+10),ylim=c(min(pcX$x[,2])-10, max(pcX$x[,2])+10))
+  text(pcX$x[,1],pcX$x[,2], labels, pos=3, cex=myCex)
+  title(paste("Plot of first 2 PCs for expressions in", dataDesc, sep=" "), cex=0.8)
+}
+
+plotPCA(exprs(eset), labels=sampleNames, dataDesc="NormData", colors=sampleColor,
+        formapunts=c(rep(16,4),rep(17,4)), myCex=0.6)
+
+```
+
+Now samles of the same experiment are togetherm which means that the expression of genes between the types of experiments which is good.
+
+####Array quality matrices
+
+Here we check for the corectness of data once more to verify the previous statements 
+
+```{r Filtering, include=F}
+arrayQualityMetrics(rawData,  reporttitle="Quality Control of Data", force=TRUE)
+annotation(eset) <- "org.Mm.eg.db"
+
+eset_filtered <- nsFilter(eset, var.func=IQR,
+         var.cutoff=0.75, var.filter=TRUE,
+         filterByQuantile=TRUE)
+```
+
+Number of genes that are out
+
+```{r Filter out}
+print(eset_filtered$filter.log$numLowVar)
+```
+
+Genes that are still used
+```{r Filter characteristics}
+print(eset_filtered$eset)
+```
+
+####Design, plots, regression
+This is where we are going to create design matrix, contrast matrix and liner model
+```{r Start analysis}
+Groups <- targets$Grups
+types <- factor(Groups)
+matrix_design <-model.matrix(~0+types)
+colnames(matrix_design)<-c("shCtrl","shNNMT","Ctrl","NNMT")
+rownames(matrix_design) <- sampleNames
+print(matrix_design)
+
+```
+
+```{r Contrast}
+matrix_contrasts <- makeContrasts (
+   	shCtrlvsshNNMT = shCtrl-shNNMT,
+  shCtrlvsCtrl = shCtrl-Ctrl,
+   shCtrlvsNNMT= shCtrl-NNMT,
+ shNNMTvsCtrl = shNNMT-Ctrl,
+shNNMTvsNNMT  = shNNMT-NNMT,
+  CtrlvsNNMT=Ctrl-NNMT ,
+  levels=matrix_design)
+
+matrix_contrasts
+```
+Fir linear model with our data
+```{r Fit model}
+fit1 <- lmFit(eset_filtered$eset, matrix_design)
+fit.main1 <- contrasts.fit(fit1, matrix_contrasts)
+fit.main1
+
+```
+
+Accounting for bayes to improve the model
+```{r adjust bayes}
+fit.main1 <- eBayes(fit.main1)
+fit.main1
+```
+
+####Toptables of the genes
+Once we have fitted our data into a linear model we create a topTable for each comparison to see what genes are differentially expressed between the observations
+```{r topTables}
+topTab1_shCtrlvsshNNMT <- topTable (fit.main1, number=nrow(fit.main1), coef="shCtrlvsshNNMT", adjust="fdr"); 
+topTab2_shCtrlvsCtrl <- topTable (fit.main1, number=nrow(fit.main1), coef="shCtrlvsCtrl", adjust="fdr"); 
+topTab3_shCtrlvsNNMT <- topTable (fit.main1, number=nrow(fit.main1), coef="shCtrlvsNNMT", adjust="fdr");
+topTab4_shNNMTvsCtrl <- topTable (fit.main1, number=nrow(fit.main1), coef="shNNMTvsCtrl", adjust="fdr"); 
+topTab5_shNNMTvsNNMT<- topTable (fit.main1, number=nrow(fit.main1), coef="shNNMTvsNNMT", adjust="fdr"); 
+topTab6_CtrlvsNNMT <- topTable (fit.main1, number=nrow(fit.main1), coef="CtrlvsNNMT", adjust="fdr");
+
+
+```
+
+
+
+####Volcano plot
+Volcanoplot for the visualization of data
+```{r Volcano}
+volcanoplot(fit.main1, highlight=10, names=fit.main1$ID, 
+            main = paste("Differentially expressed genes", colnames(matrix_contrasts), sep="\n"))
+abline(v = c(-3, 3))
+
+
+
+
+```
+
+We can see a lot of genes that seem to be differentially expressed, we can check heir function to understand what is changed in the cancer cells compared to normal ones.
+
+#### Heatmaps
+Heatmaps are found in results
+
+#### Annotations
+Annotations are found in results
